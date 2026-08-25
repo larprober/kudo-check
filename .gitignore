@@ -1,0 +1,5 @@
+node_modules/
+*.log
+demo-report.html
+kudo-report.html
+kudo.json

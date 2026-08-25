@@ -1,0 +1,42 @@
+{
+  "name": "kudo-check",
+  "version": "1.0.0",
+  "description": "Static malware analysis for repositories - scans a folder or a GitHub repo, names the malware family it finds, and explains why.",
+  "bin": {
+    "kudo": "bin/kudo.js",
+    "kudo-check": "bin/kudo.js"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node test/run.js",
+    "demo": "node bin/kudo.js --demo stealer"
+  },
+  "keywords": [
+    "malware",
+    "scanner",
+    "security",
+    "antivirus",
+    "static-analysis",
+    "supply-chain"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin",
+    "src",
+    "test/corpus.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/larprober/kudo-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/larprober/kudo-check/issues"
+  },
+  "homepage": "https://github.com/larprober/kudo-check#readme",
+  "author": "larprober"
+}
