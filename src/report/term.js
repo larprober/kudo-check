@@ -247,6 +247,11 @@ function render(result, opts = {}) {
   parts.push(kv('scanned', A.paint(C.muted,
     result.stats.files + ' files · ' + result.stats.text + ' source · ' + result.stats.binary + ' binary' +
     (result.stats.decoded ? ' · ' + result.stats.decoded + ' encoded blob' + (result.stats.decoded === 1 ? '' : 's') + ' decoded' : ''))));
+  if (result.ruleDbFiles && result.ruleDbFiles.length) {
+    parts.push(kv('skipped', A.paint(C.muted,
+      result.ruleDbFiles.length + ' detection asset' + (result.ruleDbFiles.length === 1 ? '' : 's') +
+      ' not scanned as code: ' + result.ruleDbFiles.map((x) => x.file + ' (' + x.kind + ')').join(', '))));
+  }
   parts.push('');
   parts.push(verdictPanel(result));
   const fam = familySection(result.classification);

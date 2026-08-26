@@ -13,7 +13,7 @@ const path = require('path');
 const zlib = require('zlib');
 
 const { scan, scanEntries } = require('../src/index');
-const { entries, CORPUS } = require('./corpus');
+const { entries, CORPUS, EVASION, evasion, BENIGN_FOLD } = require('./corpus');
 const { decodeLayers } = require('../src/core/decode');
 const { classify } = require('../src/core/classify');
 const { typosquatOf } = require('../src/rules/packages');
@@ -46,14 +46,17 @@ async function main() {
   /* ── decoder ── */
   head('decoder');
   {
-    const inner = 'const wallet = "wallet.dat"; eval("x");';
+    const j = (...p) => p.join('');
+    const WALLET = j('wallet', '.dat');
+    const inner = 'const w = "' + WALLET + '"; eval("x");';
     const b64 = Buffer.from(inner).toString('base64');
     const layers = decodeLayers('const S = "' + b64 + '";');
-    ok('base64 blob is decoded', layers.length > 0 && layers[0].text.includes('wallet.dat'));
+    ok('base64 blob is decoded', layers.length > 0 && layers[0].text.includes(WALLET));
 
-    const gz = zlib.gzipSync(Buffer.from('stratum+tcp://pool.example.invalid:4444 ' + 'x'.repeat(200)));
+    const POOL = j('stra', 'tum+tcp://pool.example.invalid:4444');
+    const gz = zlib.gzipSync(Buffer.from(POOL + ' ' + 'x'.repeat(200)));
     const layers2 = decodeLayers('const Z = "' + gz.toString('base64') + '";');
-    ok('gzip inside base64 is inflated', layers2.some((l) => l.compressed && l.text.includes('stratum')));
+    ok('gzip inside base64 is inflated', layers2.some((l) => l.compressed && l.text.includes(j('stra', 'tum'))));
 
     const exe = Buffer.concat([Buffer.from([0x4d, 0x5a, 0x90, 0x00]), Buffer.alloc(400, 0x41)]);
     const layers3 = decodeLayers('const E = "' + exe.toString('base64') + '";');
@@ -142,58 +145,20 @@ async function main() {
     results.obfuscated.findings.some((f) => f.ruleId === 'DEC-001'));
 
   /* ── evasion resistance ──
-     Each variant encodes the same two indicators as the plain one, written
-     differently. Fragments are joined at runtime so this file is not itself
-     quarantined by the host antivirus. */
+     Fixture material lives encoded in test/corpus.js, never inline here:
+     an unmarked file full of malware-shaped source makes the scanner flag
+     its own repository (and invites the host antivirus to eat it). */
   head('evasion resistance');
   {
-    const j = (...p) => p.join('');
-    const LOGIN = j('Log', 'in Data');
-    const DPATH = j('dis', 'cord\\\\Local Stor', 'age\\\\level', 'db');
-    const plain = 'p1 = ENV + "\\\\Chrome\\\\' + LOGIN + '"\np2 = ENV + "\\\\' + DPATH + '"';
-
-    const variants = {
-      'plain source': plain,
-      'split literals': [
-        'a = "Log" + "in" + " " + "Data"',
-        'b = "dis" + "cord"', 'c = "Local" + " Stor" + "age"', 'd = "level" + "db"',
-        'p1 = ENV + "\\\\Chrome\\\\" + a',
-        'p2 = ENV + b + "\\\\" + c + "\\\\" + d'
-      ].join('\n'),
-      'reversed literals': [
-        'a = "goL"[::-1] + "ataD ni"[::-1]',
-        'b = "drocsid"[::-1]', 'c = "egarotS lacoL"[::-1]', 'd = "bdlevel"[::-1]',
-        'p1 = ENV + a', 'p2 = ENV + b + "\\\\" + c + "\\\\" + d'
-      ].join('\n'),
-      'list join indirection': [
-        'P1 = ["Log", "in", " ", "Data"]',
-        'P2 = ["dis", "cord", "\\\\", "Local Storage", "\\\\", "leveldb"]',
-        'A = "".join(P1)', 'B = "".join(P2)',
-        'p1 = ENV + A', 'p2 = ENV + B'
-      ].join('\n'),
-      'base64 blob': [
-        'import base64',
-        'S = "' + Buffer.from(plain, 'utf8').toString('base64') + '"',
-        'ENABLED = False',
-        'if ENABLED: exec(base64.b64decode(S))'
-      ].join('\n')
-    };
-
-    for (const [label, src] of Object.entries(variants)) {
-      const r = scanEntries([{ rel: 'grab.py', buf: Buffer.from(src, 'utf8') }], { label });
+    for (const v of EVASION) {
+      const r = scanEntries([{ rel: 'grab.py', buf: evasion(v.name) }], { label: v.name });
       const ids = new Set(r.findings.map((f) => f.ruleId));
-      ok(label + ' is detected', ids.has('STL-001') && ids.has('STL-004'),
+      ok(v.name + ' is detected', v.expect.every((id) => ids.has(id)),
         [...ids].join(' ') || 'nothing found');
     }
 
-    // Normalisation must not invent findings in ordinary code.
-    const benign = [
-      'const parts = ["user", "profile", "settings"];',
-      'const key = "app" + "_" + "config";',
-      'const url = BASE + "/" + parts.join("/");',
-      'module.exports = { key, url };'
-    ].join('\n');
-    const b = scanEntries([{ rel: 'router.js', buf: Buffer.from(benign, 'utf8') }], { label: 'benign' });
+    // Constant folding must not invent findings in ordinary code.
+    const b = scanEntries([{ rel: 'router.js', buf: Buffer.from(BENIGN_FOLD, 'base64') }], { label: 'benign' });
     ok('constant folding invents nothing in benign code', b.findings.length === 0,
       b.findings.map((f) => f.ruleId).join(' '));
   }

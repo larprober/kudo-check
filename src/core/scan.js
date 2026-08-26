@@ -38,6 +38,7 @@ const SUSPICIOUS_NAME = [
 
 
 const RULE_DB_MARKER = 'KUDO' + '-SIGNATURE-DATABASE';
+const CORPUS_MARKER = 'KUDO' + '-FIXTURE-CORPUS';
 const RULE_PATH = /(?:^|\/)(?:rules?|signatures?|patterns?|detections?|yara|sigma)[\/_-]|\.(?:yar|yara)$|(?:^|\/)(?:signatures?|rules?)\.(?:js|ts|json|ya?ml|py)$/i;
 
 /**
@@ -47,6 +48,13 @@ const RULE_PATH = /(?:^|\/)(?:rules?|signatures?|patterns?|detections?|yara|sigm
  */
 function isRuleDatabase(rel, text) {
   if (text.includes(RULE_DB_MARKER)) return 'kudo signature database';
+  // A detection test corpus: encoded fixtures with expected-verdict metadata.
+  // The marker alone is not enough — the structure has to match too, so that
+  // pasting the marker into a payload does not buy an exemption.
+  if (text.includes(CORPUS_MARKER) &&
+      /expectFamily/.test(text) && /minVerdict/.test(text) && /b64:/.test(text)) {
+    return 'kudo test corpus';
+  }
   if (!RULE_PATH.test(rel)) return null;
   const regexLines = (text.match(/^\s*(?:re|pattern|regex|match)\s*[:=]\s*[/r"']/gim) || []).length;
   const ruleMeta = (text.match(/^\s*(?:severity|weight|family|tags|meta|condition|strings)\s*[:=]/gim) || []).length;
@@ -118,6 +126,27 @@ function matchText(text, rel, layer, fileExt, out, budget) {
   }
 }
 
+/**
+ * Roughly, how much of this file is code rather than prose?
+ *
+ * Security documentation legitimately names dangerous things — a scanner's own
+ * README lists them by the dozen. Malware pasted into a .txt does not read like
+ * prose. This separates the two without needing to parse either.
+ */
+function codeDensityOf(text) {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return 0;
+  let code = 0;
+  for (const l of lines) {
+    if (/[;{}]$|^\s*(?:import|from|const|let|var|def|class|function|func|package|public|private|return|if|for|while|try|catch|export)\b/.test(l) ||
+        /^\s*[\w$.]+\s*=\s*\S/.test(l) ||
+        /\w\s*\([^)]*\)\s*[:{;]?\s*$/.test(l)) {
+      code++;
+    }
+  }
+  return code / lines.length;
+}
+
 function collectIoc(text, bag) {
   for (const [kind, re] of Object.entries(IOC)) {
     re.lastIndex = 0;
@@ -145,6 +174,7 @@ function scanFiles(files, opts = {}) {
   const iocBag = new Map();
   const stats = { files: 0, text: 0, binary: 0, media: 0, bytes: 0, decoded: 0, anomalies: 0, ruleDbs: 0, normalized: 0 };
   const ruleDbFiles = [];
+  const densityByFile = new Map();
   const budget = { hits: 0, stop: false };
   const onProgress = opts.onProgress || null;
 
@@ -218,6 +248,7 @@ function scanFiles(files, opts = {}) {
 
     stats.text++;
     const text = buf.toString('utf8');
+    densityByFile.set(f.rel, codeDensityOf(text));
 
     const ruleDb = isRuleDatabase(f.rel, text);
     if (ruleDb) {
@@ -302,6 +333,7 @@ function scanFiles(files, opts = {}) {
   });
 
   const dmap = new Map(files.map((f) => [f.rel, !!f.discounted]));
+  const codeDensity = densityByFile;
   for (const fi of findings) fi.discounted = !!dmap.get(fi.file);
 
   /**
@@ -318,7 +350,7 @@ function scanFiles(files, opts = {}) {
   }
   const unmasked = [];
   for (const [file, rules] of criticalByFile) {
-    if (rules.size >= 4 && dmap.get(file)) {
+    if (rules.size >= 4 && dmap.get(file) && codeDensity.get(file) >= 0.35) {
       unmasked.push({ file, criticalRules: rules.size });
       for (const fi of findings) if (fi.file === file) fi.discounted = false;
     }

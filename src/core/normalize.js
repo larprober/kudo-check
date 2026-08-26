@@ -4,9 +4,9 @@
  * Constant folding for source text.
  *
  * A signature engine matches what is written. Malware writes the same thing
- * differently: "Log" + "in Data", a name assigned once and used later, a
- * reversed literal, a \x escape. None of that changes behaviour, all of it
- * defeats a regex.
+ * differently: a target string split across a concatenation, a name assigned
+ * once and used later, a reversed literal, an escape sequence. None of that
+ * changes behaviour, and all of it defeats a plain regex.
  *
  * This produces a second, normalised view of a file — literals folded,
  * single-assignment constants substituted, escapes and reverse/join idioms
@@ -131,7 +131,7 @@ function propagateConstants(text) {
   let out = text;
   for (const [name, value] of values) {
     if (counts.get(name) !== 1) continue;
-    // Single-letter names are explicitly allowed: `a = "Log" + "in Data"` is
+    // Single-letter names are explicitly allowed: `a = "Cre" + "dential"` is
     // the whole point. The value has to carry some content to be worth it.
     if (value.length > MAX_CONST_LEN || value.length < 3) continue;
     // Reserved-ish names would wreck the text for no gain.

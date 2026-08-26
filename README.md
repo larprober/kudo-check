@@ -118,7 +118,7 @@ Beyond signatures:
   A payload hidden inside an encoded string is reported at the line that hides
   it, with the encoding named. An embedded PE/ELF gets its own critical finding.
 - **Constant folding.** Before matching, a second normalised view of each file
-  is built: adjacent string literals folded (`"Log" + "in Data"`),
+  is built: adjacent string literals folded (`"Cre" + "dential"`),
   single-assignment constants substituted, escape sequences resolved, reverse
   idioms (`[::-1]`, `.reverse().join('')`) and list joins collapsed.
   Only detections invisible in the raw text are kept, and they are weighted

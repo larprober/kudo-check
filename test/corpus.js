@@ -1,7 +1,11 @@
 'use strict';
 
 /**
- * Kudo Check fixture corpus.
+ * Kudo Check fixture corpus.   KUDO-FIXTURE-CORPUS
+ *
+ * The marker above tells Kudo Check that the encoded blobs below are detection
+ * fixtures, not a payload. It is honoured only alongside this file structure,
+ * and every skip is reported in the scan output rather than hidden.
  *
  * These are inert detection fixtures: guards are constant false, every
  * network target is loopback, and none of it is ever executed. They are
@@ -103,4 +107,28 @@ if (require.main === module) {
   }
 }
 
-module.exports = { CORPUS, entries };
+
+/**
+ * Evasion fixtures: each writes the SAME two indicators as the plain one,
+ * spelled differently. They prove the constant-folding pass in
+ * src/core/normalize.js actually resolves what a plain regex cannot see.
+ */
+const EVASION = [
+  { name: "plain source", expect: ["STL-001", "STL-004"], b64: "cDEgPSBFTlYgKyAiXFxDaHJvbWVcXExvZ2luIERhdGEiCnAyID0gRU5WICsgIlxcZGlzY29yZFxcTG9jYWwgU3RvcmFnZVxcbGV2ZWxkYiI=" },
+  { name: "split literals", expect: ["STL-001", "STL-004"], b64: "YSA9ICJMb2ciICsgImluIiArICIgIiArICJEYXRhIgpiID0gImRpcyIgKyAiY29yZCIKYyA9ICJMb2NhbCIgKyAiIFN0b3IiICsgImFnZSIKZCA9ICJsZXZlbCIgKyAiZGIiCnAxID0gRU5WICsgIlxcQ2hyb21lXFwiICsgYQpwMiA9IEVOViArIGIgKyAiXFwiICsgYyArICJcXCIgKyBk" },
+  { name: "reversed literals", expect: ["STL-001", "STL-004"], b64: "YSA9ICJnb0wiWzo6LTFdICsgImF0YUQgbmkiWzo6LTFdCmIgPSAiZHJvY3NpZCJbOjotMV0KYyA9ICJlZ2Fyb3RTIGxhY29MIls6Oi0xXQpkID0gImJkbGV2ZWwiWzo6LTFdCnAxID0gRU5WICsgYQpwMiA9IEVOViArIGIgKyAiXFwiICsgYyArICJcXCIgKyBk" },
+  { name: "list join indirection", expect: ["STL-001", "STL-004"], b64: "UDEgPSBbIkxvZyIsICJpbiIsICIgIiwgIkRhdGEiXQpQMiA9IFsiZGlzIiwgImNvcmQiLCAiXFwiLCAiTG9jYWwgU3RvcmFnZSIsICJcXCIsICJsZXZlbGRiIl0KQSA9ICIiLmpvaW4oUDEpCkIgPSAiIi5qb2luKFAyKQpwMSA9IEVOViArIEEKcDIgPSBFTlYgKyBC" },
+  { name: "hex escapes", expect: ["STL-001", "STL-004"], b64: "YSA9ICJceDRjXHg2Zlx4NjdceDY5XHg2ZVx4MjBceDQ0XHg2MVx4NzRceDYxIgpiID0gIlx4NjRceDY5XHg3M1x4NjNceDZmXHg3Mlx4NjRceDVjXHg0Y1x4NmZceDYzXHg2MVx4NmNceDIwXHg1M1x4NzRceDZmXHg3Mlx4NjFceDY3XHg2NVx4NWNceDZjXHg2NVx4NzZceDY1XHg2Y1x4NjRceDYyIgpwMSA9IEVOViArIGEKcDIgPSBFTlYgKyBi" },
+  { name: "base64 blob", expect: ["STL-001", "STL-004"], b64: "aW1wb3J0IGJhc2U2NApTID0gImNERWdQU0JGVGxZZ0t5QWlYRnhEYUhKdmJXVmNYRXh2WjJsdUlFUmhkR0VpQ25BeUlEMGdSVTVXSUNzZ0lseGNaR2x6WTI5eVpGeGNURzlqWVd3Z1UzUnZjbUZuWlZ4Y2JHVjJaV3hrWWlJPSIKRU5BQkxFRCA9IEZhbHNlCmlmIEVOQUJMRUQ6IGV4ZWMoYmFzZTY0LmI2NGRlY29kZShTKSk=" },
+];
+
+/** Ordinary code that constant folding must NOT turn into a finding. */
+const BENIGN_FOLD = "Y29uc3QgcGFydHMgPSBbInVzZXIiLCAicHJvZmlsZSIsICJzZXR0aW5ncyJdOwpjb25zdCBrZXkgPSAiYXBwIiArICJfIiArICJjb25maWciOwpjb25zdCB1cmwgPSBCQVNFICsgIi8iICsgcGFydHMuam9pbigiLyIpOwptb2R1bGUuZXhwb3J0cyA9IHsga2V5LCB1cmwgfTs=";
+
+/** Decode one evasion variant into a scannable buffer. */
+function evasion(name) {
+  const v = EVASION.find((e) => e.name === name);
+  if (!v) throw new Error('unknown evasion variant: ' + name);
+  return Buffer.from(v.b64, 'base64');
+}
+module.exports = { CORPUS, entries, EVASION, evasion, BENIGN_FOLD };
